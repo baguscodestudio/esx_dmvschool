@@ -1,16 +1,15 @@
-local CurrentAction     = nil
-local CurrentActionMsg  = nil
-local CurrentActionData = nil
-local Licenses          = {}
-local CurrentTest       = nil
-local CurrentTestType   = nil
-local CurrentVehicle    = nil
+local CurrentAction                  = nil
+local CurrentActionMsg               = nil
+local CurrentActionData              = nil
+local CurrentTest                    = nil
+local CurrentTestType                = nil
+local CurrentVehicle                 = nil
 local CurrentCheckPoint, DriveErrors = 0, 0
-local LastCheckPoint    = -1
-local CurrentBlip       = nil
-local CurrentZoneType   = nil
-local IsAboveSpeedLimit = false
-local LastVehicleHealth = nil
+local LastCheckPoint                 = -1
+local CurrentBlip                    = nil
+local CurrentZoneType                = nil
+local IsAboveSpeedLimit              = false
+local LastVehicleHealth              = nil
 
 function DrawMissionText(msg, time)
 	ClearPrints()
@@ -29,8 +28,6 @@ function StartTheoryTest()
 	ESX.SetTimeout(200, function()
 		SetNuiFocus(true, true)
 	end)
-
-
 end
 
 function StopTheoryTest(success)
@@ -43,7 +40,7 @@ function StopTheoryTest(success)
 	SetNuiFocus(false)
 
 	if success then
-		TriggerServerEvent('esx_dmvschool:addLicense', 'dmv')
+		TriggerEvent('LicenseManager:addLicense', 'dmv')
 		ESX.ShowNotification(TranslateCap('passed_test'))
 	else
 		ESX.ShowNotification(TranslateCap('failed_test'))
@@ -51,27 +48,29 @@ function StopTheoryTest(success)
 end
 
 function StartDriveTest(type)
-	ESX.Game.SpawnVehicle(Config.VehicleModels[type], vector3(Config.Zones.VehicleSpawnPoint.Pos.x, Config.Zones.VehicleSpawnPoint.Pos.y, Config.Zones.VehicleSpawnPoint.Pos.z), Config.Zones.VehicleSpawnPoint.Pos.h, function(vehicle)
-		CurrentTest       = 'drive'
-		CurrentTestType   = type
-		CurrentCheckPoint = 0
-		LastCheckPoint    = -1
-		CurrentZoneType   = 'residence'
-		DriveErrors       = 0
-		IsAboveSpeedLimit = false
-		CurrentVehicle    = vehicle
-		LastVehicleHealth = GetEntityHealth(vehicle)
+	ESX.Game.SpawnVehicle(Config.VehicleModels[type],
+		vector3(Config.Zones.VehicleSpawnPoint.Pos.x, Config.Zones.VehicleSpawnPoint.Pos.y,
+			Config.Zones.VehicleSpawnPoint.Pos.z), Config.Zones.VehicleSpawnPoint.Pos.h, function(vehicle)
+			CurrentTest       = 'drive'
+			CurrentTestType   = type
+			CurrentCheckPoint = 0
+			LastCheckPoint    = -1
+			CurrentZoneType   = 'residence'
+			DriveErrors       = 0
+			IsAboveSpeedLimit = false
+			CurrentVehicle    = vehicle
+			LastVehicleHealth = GetEntityHealth(vehicle)
 
-		local playerPed   = PlayerPedId()
-		TaskWarpPedIntoVehicle(playerPed, vehicle, -1)
-		SetVehicleFuelLevel(vehicle, 100.0)
-		DecorSetFloat(vehicle, "_FUEL_LEVEL", GetVehicleFuelLevel(vehicle))
-	end)
+			local playerPed   = PlayerPedId()
+			TaskWarpPedIntoVehicle(playerPed, vehicle, -1)
+			SetVehicleFuelLevel(vehicle, 100.0)
+			DecorSetFloat(vehicle, "_FUEL_LEVEL", GetVehicleFuelLevel(vehicle))
+		end)
 end
 
 function StopDriveTest(success)
 	if success then
-		TriggerServerEvent('esx_dmvschool:addLicense', CurrentTestType)
+		TriggerEvent('LicenseManager:addLicense', CurrentTestType)
 		ESX.ShowNotification(TranslateCap('passed_test'))
 	else
 		ESX.ShowNotification(TranslateCap('failed_test'))
@@ -82,82 +81,84 @@ function StopDriveTest(success)
 end
 
 function SetCurrentZoneType(type)
-CurrentZoneType = type
+	CurrentZoneType = type
 end
 
 function OpenDMVSchoolMenu()
-	local ownedLicenses = {}
+	ESX.TriggerServerCallback('esx_license:getLicenses', function(result)
+		local ownedLicenses = {}
 
-	for i=1, #Licenses, 1 do
-		ownedLicenses[Licenses[i].type] = true
-	end
+		for i = 1, #result, 1 do
+			ownedLicenses[result[i].type] = true
+		end
 
-	local elements = {
-		{unselectable = true, icon = "fas fa-car", title = TranslateCap("driving_school")}
-	}
-
-	if not ownedLicenses['dmv'] then
-		elements[#elements+1] = {
-			icon = "fas fa-car",
-			title = (('%s: <span style="color:green;">%s</span>'):format(TranslateCap('theory_test'), TranslateCap('school_item', ESX.Math.GroupDigits(Config.Prices['dmv'])))),
-			value = "theory_test"
+		local elements = {
+			{ unselectable = true, icon = "fas fa-car", title = TranslateCap("driving_school") }
 		}
-	end
 
-	if ownedLicenses['dmv'] then
-		if not ownedLicenses['drive'] then
-			elements[#elements+1] = {
+		if not ownedLicenses['dmv'] then
+			elements[#elements + 1] = {
 				icon = "fas fa-car",
-				title = (('%s: <span style="color:green;">%s</span>'):format(TranslateCap('road_test_car'), TranslateCap('school_item', ESX.Math.GroupDigits(Config.Prices['drive'])))),
-				value = "drive_test",
-				type = "drive"
+				title = (('%s: <span style="color:green;">%s</span>'):format(TranslateCap('theory_test'), TranslateCap('school_item', ESX.Math.GroupDigits(Config.Prices['dmv'])))),
+				value = "theory_test"
 			}
 		end
 
-		if not ownedLicenses['drive_bike'] then
-			elements[#elements+1] = {
-				icon = "fas fa-car",
-				title = (('%s: <span style="color:green;">%s</span>'):format(TranslateCap('road_test_bike'), TranslateCap('school_item', ESX.Math.GroupDigits(Config.Prices['drive_bike'])))),
-				value = "drive_test",
-				type = "drive_bike"
-			}
+		if ownedLicenses['dmv'] then
+			if not ownedLicenses['driver_car'] then
+				elements[#elements + 1] = {
+					icon = "fas fa-car",
+					title = (('%s: <span style="color:green;">%s</span>'):format(TranslateCap('road_test_car'), TranslateCap('school_item', ESX.Math.GroupDigits(Config.Prices['driver_car'])))),
+					value = "drive_test",
+					type = "driver_car"
+				}
+			end
+
+			if not ownedLicenses['driver_bike'] then
+				elements[#elements + 1] = {
+					icon = "fas fa-car",
+					title = (('%s: <span style="color:green;">%s</span>'):format(TranslateCap('road_test_bike'), TranslateCap('school_item', ESX.Math.GroupDigits(Config.Prices['driver_bike'])))),
+					value = "drive_test",
+					type = "driver_bike"
+				}
+			end
+
+			if not ownedLicenses['driver_truck'] then
+				elements[#elements + 1] = {
+					icon = "fas fa-car",
+					title = (('%s: <span style="color:green;">%s</span>'):format(TranslateCap('road_test_truck'), TranslateCap('school_item', ESX.Math.GroupDigits(Config.Prices['driver_truck'])))),
+					value = "drive_test",
+					type = "driver_truck"
+				}
+			end
 		end
 
-		if not ownedLicenses['drive_truck'] then
-			elements[#elements+1] = {
-				icon = "fas fa-car",
-				title = (('%s: <span style="color:green;">%s</span>'):format(TranslateCap('road_test_truck'), TranslateCap('school_item', ESX.Math.GroupDigits(Config.Prices['drive_truck'])))),
-				value = "drive_test",
-				type = "drive_truck"
-			}
-		end
-	end
-
-	ESX.OpenContext("right", elements, function(menu,element)
-		if element.value == "theory_test" then
-			ESX.TriggerServerCallback('esx_dmvschool:canYouPay', function(haveMoney)
-				if haveMoney then
-					ESX.CloseContext()
-					StartTheoryTest()
-				else
-					ESX.ShowNotification(TranslateCap('not_enough_money'))
-				end
-			end, 'dmv')
-		elseif element.value == "drive_test" then
-			ESX.TriggerServerCallback('esx_dmvschool:canYouPay', function(haveMoney)
-				if haveMoney then
-					ESX.CloseContext()
-					StartDriveTest(element.type)
-				else
-					ESX.ShowNotification(TranslateCap('not_enough_money'))
-				end
-			end, element.type)
-		end
-	end, function(menu)
-		CurrentAction     = 'dmvschool_menu'
-		CurrentActionMsg  = TranslateCap('press_open_menu')
-		CurrentActionData = {}
-	end)
+		ESX.OpenContext("right", elements, function(menu, element)
+			if element.value == "theory_test" then
+				ESX.TriggerServerCallback('esx_dmvschool:canYouPay', function(haveMoney)
+					if haveMoney then
+						ESX.CloseContext()
+						StartTheoryTest()
+					else
+						ESX.ShowNotification(TranslateCap('not_enough_money'))
+					end
+				end, 'dmv')
+			elseif element.value == "drive_test" then
+				ESX.TriggerServerCallback('esx_dmvschool:canYouPay', function(haveMoney)
+					if haveMoney then
+						ESX.CloseContext()
+						StartDriveTest(element.type)
+					else
+						ESX.ShowNotification(TranslateCap('not_enough_money'))
+					end
+				end, element.type)
+			end
+		end, function(menu)
+			CurrentAction     = 'dmvschool_menu'
+			CurrentActionMsg  = TranslateCap('press_open_menu')
+			CurrentActionData = {}
+		end)
+	end, GetPlayerServerId(PlayerId()))
 end
 
 RegisterNUICallback('question', function(data, cb)
@@ -191,19 +192,15 @@ AddEventHandler('esx_dmvschool:hasExitedMarker', function(zone)
 	ESX.CloseContext()
 end)
 
-RegisterNetEvent('esx_dmvschool:loadLicenses')
-AddEventHandler('esx_dmvschool:loadLicenses', function(licenses)
-	Licenses = licenses
-end)
-
 -- Create Blips
 CreateThread(function()
-	local blip = AddBlipForCoord(Config.Zones.DMVSchool.Pos.x, Config.Zones.DMVSchool.Pos.y, Config.Zones.DMVSchool.Pos.z)
+	local blip = AddBlipForCoord(Config.Zones.DMVSchool.Pos.x, Config.Zones.DMVSchool.Pos.y, Config.Zones.DMVSchool.Pos
+		.z)
 
-	SetBlipSprite (blip, 408)
-	SetBlipColour (blip, 0)
+	SetBlipSprite(blip, 408)
+	SetBlipColour(blip, 0)
 	SetBlipDisplay(blip, 4)
-	SetBlipScale  (blip, 1.2)
+	SetBlipScale(blip, 1.2)
 	SetBlipAsShortRange(blip, true)
 
 	BeginTextCommandSetBlipName("STRING")
@@ -218,16 +215,16 @@ CreateThread(function()
 		local playerPed = PlayerPedId()
 		local coords = GetEntityCoords(playerPed)
 
-		for k,v in pairs(Config.Zones) do
+		for k, v in pairs(Config.Zones) do
 			local Pos = vector3(v.Pos.x, v.Pos.y, v.Pos.z)
-			if(v.Type ~= -1 and #(coords - Pos) < Config.DrawDistance) then
+			if (v.Type ~= -1 and #(coords - Pos) < Config.DrawDistance) then
 				sleep = 0
-				DrawMarker(v.Type, v.Pos.x, v.Pos.y, v.Pos.z, 0.0, 0.0, 0.0, 0, 0.0, 0.0, v.Size.x, v.Size.y, v.Size.z, v.Color.r, v.Color.g, v.Color.b, 100, false, true, 2, false, false, false, false)
+				DrawMarker(v.Type, v.Pos.x, v.Pos.y, v.Pos.z, 0.0, 0.0, 0.0, 0, 0.0, 0.0, v.Size.x, v.Size.y, v.Size.z,
+					v.Color.r, v.Color.g, v.Color.b, 100, false, true, 2, false, false, false, false)
 			end
 		end
 
 		if CurrentTest == 'theory' then
-			
 			sleep = 0
 			DisableControlAction(0, 1, true) -- LookLeftRight
 			DisableControlAction(0, 2, true) -- LookUpDown
@@ -260,17 +257,21 @@ CreateThread(function()
 						RemoveBlip(CurrentBlip)
 					end
 
-					CurrentBlip = AddBlipForCoord(Config.CheckPoints[nextCheckPoint].Pos.x, Config.CheckPoints[nextCheckPoint].Pos.y, Config.CheckPoints[nextCheckPoint].Pos.z)
+					CurrentBlip = AddBlipForCoord(Config.CheckPoints[nextCheckPoint].Pos.x,
+						Config.CheckPoints[nextCheckPoint].Pos.y, Config.CheckPoints[nextCheckPoint].Pos.z)
 					SetBlipRoute(CurrentBlip, 1)
 
 					LastCheckPoint = CurrentCheckPoint
 				end
-            
-				local Pos = vector3(Config.CheckPoints[nextCheckPoint].Pos.x,Config.CheckPoints[nextCheckPoint].Pos.y,Config.CheckPoints[nextCheckPoint].Pos.z)
+
+				local Pos = vector3(Config.CheckPoints[nextCheckPoint].Pos.x, Config.CheckPoints[nextCheckPoint].Pos.y,
+					Config.CheckPoints[nextCheckPoint].Pos.z)
 				local distance = #(coords - Pos)
-            
+
 				if distance <= Config.DrawDistance then
-					DrawMarker(1, Config.CheckPoints[nextCheckPoint].Pos.x, Config.CheckPoints[nextCheckPoint].Pos.y, Config.CheckPoints[nextCheckPoint].Pos.z, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 1.5, 1.5, 1.5, 102, 204, 102, 100, false, true, 2, false, false, false, false)
+					DrawMarker(1, Config.CheckPoints[nextCheckPoint].Pos.x, Config.CheckPoints[nextCheckPoint].Pos.y,
+						Config.CheckPoints[nextCheckPoint].Pos.z, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 1.5, 1.5, 1.5, 102, 204,
+						102, 100, false, true, 2, false, false, false, false)
 				end
 
 				if distance <= 3.0 then
@@ -289,14 +290,14 @@ CreateThread(function()
 				CurrentAction = nil
 			end
 		end
-		
+
 		local isInMarker  = false
 		local currentZone = nil
 
-		for k,v in pairs(Config.Zones) do
+		for k, v in pairs(Config.Zones) do
 			local Pos = vector3(v.Pos.x, v.Pos.y, v.Pos.z)
-			if(#(coords - Pos) < v.Size.x) then
-				sleep = 0
+			if (#(coords - Pos) < v.Size.x) then
+				sleep       = 0
 				isInMarker  = true
 				currentZone = k
 			end
@@ -326,12 +327,11 @@ CreateThread(function()
 			local playerPed = PlayerPedId()
 
 			if IsPedInAnyVehicle(playerPed, false) then
-
 				local vehicle      = GetVehiclePedIsIn(playerPed, false)
 				local speed        = GetEntitySpeed(vehicle) * Config.SpeedMultiplier
 				local tooMuchSpeed = false
 
-				for k,v in pairs(Config.SpeedLimits) do
+				for k, v in pairs(Config.SpeedLimits) do
 					if CurrentZoneType == k and speed > v then
 						tooMuchSpeed = true
 
@@ -351,7 +351,6 @@ CreateThread(function()
 
 				local health = GetEntityHealth(vehicle)
 				if health < LastVehicleHealth then
-
 					DriveErrors += 1
 
 					ESX.ShowNotification(TranslateCap('you_damaged_veh'))
